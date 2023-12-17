@@ -36,6 +36,8 @@ static const int config_max_recent_roms = 10;
 
 struct config_Emulator
 {
+    bool fullscreen = false;
+    bool show_menu = true;
     bool paused = false;
     int save_slot = 0;
     bool start_paused = false;
@@ -49,6 +51,9 @@ struct config_Emulator
     std::string savefiles_path;
     int savestates_dir_option = 0;
     std::string savestates_path;
+    std::string last_open_path;
+    int window_width = 770;
+    int window_height = 600;
 };
 
 struct config_Video
@@ -57,6 +62,7 @@ struct config_Video
     int ratio = 0;
     bool fps = false;
     bool bilinear = false;
+    bool sprite_limit = false;
     bool mix_frames = true;
     float mix_frames_intensity = 0.30f;
     bool scanlines = true;
@@ -85,6 +91,8 @@ struct config_Input
     SDL_Scancode key_down;
     SDL_Scancode key_left_button;
     SDL_Scancode key_right_button;
+    SDL_Scancode key_blue;
+    SDL_Scancode key_purple;
     SDL_Scancode key_0;
     SDL_Scancode key_1;
     SDL_Scancode key_2;
@@ -103,6 +111,8 @@ struct config_Input
     bool gamepad_invert_y_axis;
     int gamepad_left_button;
     int gamepad_right_button;
+    int gamepad_blue;
+    int gamepad_purple;
     int gamepad_x_axis;
     int gamepad_y_axis;
     int gamepad_1;

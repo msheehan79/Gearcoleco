@@ -17,6 +17,7 @@
  *
  */
 
+#include <math.h>
 #include "imgui/imgui.h"
 #include "imgui/imgui_memory_editor.h"
 #include "imgui/fonts/RobotoMedium.h"
@@ -41,7 +42,6 @@ static int* configured_button;
 static ImVec4 custom_palette[16];
 static bool shortcut_open_rom = false;
 static ImFont* default_font[4];
-static bool show_main_menu = true;
 static char bios_path[4096] = "";
 static char savefiles_path[4096] = "";
 static char savestates_path[4096] = "";
@@ -53,7 +53,6 @@ static void file_dialog_load_ram(void);
 static void file_dialog_save_ram(void);
 static void file_dialog_load_state(void);
 static void file_dialog_save_state(void);
-// static void file_dialog_choose_save_file_path(void);
 static void file_dialog_choose_savestate_path(void);
 static void file_dialog_load_bios(void);
 static void file_dialog_load_symbols(void);
@@ -72,7 +71,6 @@ static void menu_pause(void);
 static void menu_ffwd(void);
 static void show_info(void);
 static void show_fps(void);
-//static Cartridge::CartridgeTypes get_mapper(int index);
 static Cartridge::CartridgeRegions get_region(int index);
 
 void gui_init(void)
@@ -179,7 +177,7 @@ void gui_shortcut(gui_ShortCutEvent event)
             gui_debug_go_back();
         break;
     case gui_ShortcutShowMainMenu:
-        show_main_menu = !show_main_menu;
+        config_emulator.show_menu = !config_emulator.show_menu;
         break;
     default:
         break;
@@ -231,7 +229,7 @@ static void main_menu(void)
     for (int i = 0; i < 16; i++)
         custom_palette[i] = color_int_to_float(config_video.color[i]);
     
-    if (show_main_menu && ImGui::BeginMainMenuBar())
+    if (config_emulator.show_menu && ImGui::BeginMainMenuBar())
     {
         if (ImGui::BeginMenu(GEARCOLECO_TITLE))
         {
@@ -294,18 +292,6 @@ static void main_menu(void)
                 ImGui::PopItemWidth();
                 ImGui::EndMenu();
             }
-
-            // ImGui::Separator();
-
-            // if (ImGui::MenuItem("Save RAM As...")) 
-            // {
-            //     save_ram = true;
-            // }
-
-            // if (ImGui::MenuItem("Load RAM From..."))
-            // {
-            //     open_ram = true;
-            // }
 
             ImGui::Separator();
 
@@ -394,33 +380,6 @@ static void main_menu(void)
             
             ImGui::Separator();
 
-            // if (ImGui::BeginMenu("Save File Location"))
-            // {
-            //     ImGui::PushItemWidth(220.0f);
-            //     if (ImGui::Combo("##savefile_option", &config_emulator.savefiles_dir_option, "Save Files In Custom Folder\0Save Files In ROM Folder\0\0"))
-            //     {
-            //         emu_savefiles_dir_option = config_emulator.savefiles_dir_option;
-            //     }
-
-            //     if (config_emulator.savefiles_dir_option == 0)
-            //     {
-            //         if (ImGui::MenuItem("Choose Save File Folder..."))
-            //         {
-            //             choose_save_file_path = true;
-            //         }
-
-            //         ImGui::PushItemWidth(350);
-            //         if (ImGui::InputText("##savefile_path", savefiles_path, IM_ARRAYSIZE(savefiles_path), ImGuiInputTextFlags_AutoSelectAll))
-            //         {
-            //             config_emulator.savefiles_path.assign(savefiles_path);
-            //             strcpy(emu_savefiles_path, savefiles_path);
-            //         }
-            //         ImGui::PopItemWidth();
-            //     }
-
-            //     ImGui::EndMenu();
-            // }
-
             if (ImGui::BeginMenu("Save State Location"))
             {
                 ImGui::PushItemWidth(220.0f);
@@ -459,12 +418,12 @@ static void main_menu(void)
         {
             gui_in_use = true;
 
-            if (ImGui::MenuItem("Full Screen", "F11", &application_fullscreen))
+            if (ImGui::MenuItem("Full Screen", "F11", &config_emulator.fullscreen))
             {
-                application_trigger_fullscreen(application_fullscreen);
+                application_trigger_fullscreen(config_emulator.fullscreen);
             }
 
-            ImGui::MenuItem("Show Menu", "CTRL+M", &show_main_menu);
+            ImGui::MenuItem("Show Menu", "CTRL+M", &config_emulator.show_menu);
 
             ImGui::Separator();
 
@@ -502,6 +461,10 @@ static void main_menu(void)
             ImGui::Separator();
 
             ImGui::MenuItem("Bilinear Filtering", "", &config_video.bilinear);
+            if (ImGui::MenuItem("Disable Sprite Limit", "", &config_video.sprite_limit))
+            {
+                emu_video_no_sprite_limit(config_video.sprite_limit);
+            }
 
             if (ImGui::BeginMenu("Screen Ghosting"))
             {
@@ -560,8 +523,10 @@ static void main_menu(void)
                     keyboard_configuration_item("Right:", &config_input[0].key_right, 0);
                     keyboard_configuration_item("Up:", &config_input[0].key_up, 0);
                     keyboard_configuration_item("Down:", &config_input[0].key_down, 0);
-                    keyboard_configuration_item("Left Button:", &config_input[0].key_left_button, 0);
-                    keyboard_configuration_item("Right Button:", &config_input[0].key_right_button, 0);
+                    keyboard_configuration_item("Yellow (Left):", &config_input[0].key_left_button, 0);
+                    keyboard_configuration_item("Red (Right):", &config_input[0].key_right_button, 0);
+                    keyboard_configuration_item("Purple:", &config_input[0].key_purple, 0);
+                    keyboard_configuration_item("Blue:", &config_input[0].key_blue, 0);
                     keyboard_configuration_item("Keypad 0:", &config_input[0].key_0, 0);
                     keyboard_configuration_item("Keypad 1:", &config_input[0].key_1, 0);
                     keyboard_configuration_item("Keypad 2:", &config_input[0].key_2, 0);
@@ -572,8 +537,8 @@ static void main_menu(void)
                     keyboard_configuration_item("Keypad 7:", &config_input[0].key_7, 0);
                     keyboard_configuration_item("Keypad 8:", &config_input[0].key_8, 0);
                     keyboard_configuration_item("Keypad 9:", &config_input[0].key_9, 0);
-                    keyboard_configuration_item("Asterisk:", &config_input[0].key_asterisk, 0);
-                    keyboard_configuration_item("Hash:", &config_input[0].key_hash, 0);
+                    keyboard_configuration_item("Keypad *:", &config_input[0].key_asterisk, 0);
+                    keyboard_configuration_item("Keypad #:", &config_input[0].key_hash, 0);
 
                     popup_modal_keyboard();
 
@@ -586,8 +551,10 @@ static void main_menu(void)
                     keyboard_configuration_item("Right:", &config_input[1].key_right, 1);
                     keyboard_configuration_item("Up:", &config_input[1].key_up, 1);
                     keyboard_configuration_item("Down:", &config_input[1].key_down, 1);
-                    keyboard_configuration_item("Left Button:", &config_input[1].key_left_button, 1);
-                    keyboard_configuration_item("Right Button:", &config_input[1].key_right_button, 1);
+                    keyboard_configuration_item("Yellow (Left):", &config_input[1].key_left_button, 1);
+                    keyboard_configuration_item("Red (Right):", &config_input[1].key_right_button, 1);
+                    keyboard_configuration_item("Purple:", &config_input[1].key_purple, 1);
+                    keyboard_configuration_item("Blue:", &config_input[1].key_blue, 1);
                     keyboard_configuration_item("Keypad 0:", &config_input[1].key_0, 1);
                     keyboard_configuration_item("Keypad 1:", &config_input[1].key_1, 1);
                     keyboard_configuration_item("Keypad 2:", &config_input[1].key_2, 1);
@@ -598,8 +565,8 @@ static void main_menu(void)
                     keyboard_configuration_item("Keypad 7:", &config_input[1].key_7, 1);
                     keyboard_configuration_item("Keypad 8:", &config_input[1].key_8, 1);
                     keyboard_configuration_item("Keypad 9:", &config_input[1].key_9, 1);
-                    keyboard_configuration_item("Asterisk:", &config_input[1].key_asterisk, 1);
-                    keyboard_configuration_item("Hash:", &config_input[1].key_hash, 1);
+                    keyboard_configuration_item("Keypad *:", &config_input[1].key_asterisk, 1);
+                    keyboard_configuration_item("Keypad #", &config_input[1].key_hash, 1);
 
                     popup_modal_keyboard();
 
@@ -627,8 +594,10 @@ static void main_menu(void)
 
                     if (ImGui::BeginMenu("Button Configuration"))
                     {
-                        gamepad_configuration_item("Left Button:", &config_input[0].gamepad_left_button, 0);
-                        gamepad_configuration_item("Right Button:", &config_input[0].gamepad_right_button, 0);
+                        gamepad_configuration_item("Yellow (Left):", &config_input[0].gamepad_left_button, 0);
+                        gamepad_configuration_item("Red (Right):", &config_input[0].gamepad_right_button, 0);
+                        gamepad_configuration_item("Purple:", &config_input[0].gamepad_purple, 0);
+                        gamepad_configuration_item("Blue:", &config_input[0].gamepad_blue, 0);
                         gamepad_configuration_item("Keypad 0:", &config_input[0].gamepad_0, 0);
                         gamepad_configuration_item("Keypad 1:", &config_input[0].gamepad_1, 0);
                         gamepad_configuration_item("Keypad 2:", &config_input[0].gamepad_2, 0);
@@ -664,8 +633,10 @@ static void main_menu(void)
 
                     if (ImGui::BeginMenu("Button Configuration"))
                     {
-                        gamepad_configuration_item("Left Button:", &config_input[1].gamepad_left_button, 1);
-                        gamepad_configuration_item("Right Button:", &config_input[1].gamepad_right_button, 1);
+                        gamepad_configuration_item("Yellow (Left):", &config_input[1].gamepad_left_button, 1);
+                        gamepad_configuration_item("Red (Right):", &config_input[1].gamepad_right_button, 1);
+                        gamepad_configuration_item("Purple:", &config_input[1].gamepad_purple, 1);
+                        gamepad_configuration_item("Blue:", &config_input[1].gamepad_blue, 1);
                         gamepad_configuration_item("Keypad 0:", &config_input[1].gamepad_0, 1);
                         gamepad_configuration_item("Keypad 1:", &config_input[1].gamepad_1, 1);
                         gamepad_configuration_item("Keypad 2:", &config_input[1].gamepad_2, 1);
@@ -900,7 +871,7 @@ static void main_window(void)
     emu_get_runtime(runtime);
 
     int w = (int)ImGui::GetIO().DisplaySize.x;
-    int h = (int)ImGui::GetIO().DisplaySize.y - (show_main_menu ? main_menu_height : 0);
+    int h = (int)ImGui::GetIO().DisplaySize.y - (config_emulator.show_menu ? main_menu_height : 0);
 
     int selected_ratio = config_debug.debug ? 0 : config_video.ratio;
     float ratio = 0;
@@ -947,7 +918,7 @@ static void main_window(void)
     int main_window_height = h_corrected * factor;
 
     int window_x = (w - (w_corrected * factor)) / 2;
-    int window_y = ((h - (h_corrected * factor)) / 2) + (show_main_menu ? main_menu_height : 0);
+    int window_y = ((h - (h_corrected * factor)) / 2) + (config_emulator.show_menu ? main_menu_height : 0);
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
@@ -995,8 +966,10 @@ static void main_window(void)
 
 static void file_dialog_open_rom(void)
 {
-    if(file_dialog.showFileDialog("Open ROM...", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 400), "*.*,.col,.cv,.rom,.bin,.zip", &dialog_in_use))
+    if(file_dialog.showFileDialog("Open ROM...", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 400), "*.*,.col,.cv,.rom,.bin,.zip", &dialog_in_use, config_emulator.last_open_path))
     {
+        config_emulator.last_open_path.assign(file_dialog.selected_path_without_file_name);
+
         gui_load_rom(file_dialog.selected_path.c_str());
     }
 }
@@ -1006,8 +979,6 @@ static void file_dialog_load_ram(void)
     if(file_dialog.showFileDialog("Load RAM From...", imgui_addons::ImGuiFileBrowser::DialogMode::OPEN, ImVec2(700, 310), ".sav,*.*", &dialog_in_use))
     {
         Cartridge::ForceConfiguration config;
-
-// TODO
         config.region = get_region(config_emulator.region);
 
         emu_load_ram(file_dialog.selected_path.c_str(), config);
